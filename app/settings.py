@@ -30,7 +30,6 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: list[AnyHttpUrl] = []
 
     GOOGLE_CLIENT_ID: str | None = None
-    SECRET_KEY: str | None = None
 
     @validator("BACKEND_CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v: str | list[str]) -> str | list[str]:
@@ -65,6 +64,3 @@ def setup_logging():
     handler_access = logging.StreamHandler()
     handler_access.setFormatter(logging.Formatter(settings.LOG_ACCESS_FORMAT))
     logging.getLogger("uvicorn.access").handlers = [handler_access]
-
-
-settings = Settings()
