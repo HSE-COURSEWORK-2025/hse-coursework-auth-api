@@ -9,6 +9,8 @@ from starlette.middleware.cors import CORSMiddleware
 from app.settings import settings, setup_logging
 from app.api.root import root_router
 from app.api.v1.router import api_v1_router
+from app.services.db.schemas import Base
+from app.services.db.engine import db_engine
 
 
 logger = logging.getLogger(__name__)
@@ -50,6 +52,10 @@ async def startup_event():
         include_in_schema=False,
         tags=["root"],
     )
+    try:
+        Base.metadata.create_all(bind=db_engine.engine)
+    except Exception:
+        pass
 
 
 @app.on_event("shutdown")
