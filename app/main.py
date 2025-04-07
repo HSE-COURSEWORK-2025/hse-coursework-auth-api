@@ -21,7 +21,7 @@ def custom_generate_unique_id(route: APIRoute):
 
 
 app = FastAPI(
-    root_path="/results-provider",
+    root_path="/auth-api",
     title=settings.APP_TITLE,
     version=settings.APP_VERSION,
     contact={

@@ -8,11 +8,11 @@ spec:
   rules:
     - http:
         paths:
-          - path: /results-provider
+          - path: /auth-api
             pathType: Prefix
             backend:
               service:
-                name: results-provider
+                name: auth-api
                 port:
                   number: 8080
           - path: /

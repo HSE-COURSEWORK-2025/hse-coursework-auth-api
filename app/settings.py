@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     BASE_DIR: Path = Path(__file__).resolve().parent.parent
     APP_VERSION: str = "dev"
-    APP_TITLE: str = "HSE-COURSEWORK Frontend API"
+    APP_TITLE: str = "HSE-COURSEWORK Auth API"
     APP_CONTACT_NAME: str = "MALYSH_II"
     APP_CONTACT_EMAIL: EmailStr = "iimalysh@edu.hse.ru"
     APP_OPENAPI_URL: str = "/openapi.json"

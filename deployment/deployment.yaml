@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: results-provier
+  name: auth-api
   labels:
-    app: results-provider
+    app: auth-api
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: results-provider
+      app: auth-api
   template:
     metadata:
       labels:
-        app: results-provider
+        app: auth-api
     spec:
       containers:
-      - name: results-provider-container
-        image: awesomecosmonaut/results-provider-app:latest
+      - name: auth-api-container
+        image: awesomecosmonaut/auth-api-app:latest
         ports:
         - containerPort: 8080
         resources:
