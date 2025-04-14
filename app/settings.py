@@ -24,7 +24,8 @@ class Settings(BaseSettings):
     ROOT_PATH: str | None = "/auth-api"
     PORT: int | None = 8080
 
-    SECRET_KEY: str = secrets.token_urlsafe(32)
+    # SECRET_KEY: str = secrets.token_urlsafe(32)
+    SECRET_KEY: str = "oleg"
 
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     BACKEND_CORS_ORIGINS: list[AnyHttpUrl] = []
@@ -33,6 +34,15 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str | None = None
 
     GOOGLE_REDIRECT_URI: str | None = ""
+
+    REDIS_HOST: str | None  = "localhost"
+    REDIS_PORT: str | None  = "6379"
+    QR_AUTH_PREFIX: str | None ='qr-auth-'
+
+
+    ALGORITHM: str | None = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int | None = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int | None = 7
 
     @validator("BACKEND_CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v: str | list[str]) -> str | list[str]:

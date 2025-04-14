@@ -13,6 +13,9 @@ from app.api.v1.router import api_v1_router
 from app.services.db.schemas import Base
 from app.services.db.engine import db_engine
 
+from app.services.redis.engine import redis_client
+
+
 logger = logging.getLogger(__name__)
 setup_logging()
 
@@ -90,12 +93,15 @@ async def startup_event():
     except Exception:
         pass
 
+    await redis_client.connect()
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     # await cmdb_client_stop()
     # await FastAPILimiter.close()
     ...
+    await redis_client.disconnect()
 
 
 if settings.BACKEND_CORS_ORIGINS:
