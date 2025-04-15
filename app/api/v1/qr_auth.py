@@ -55,7 +55,8 @@ async def get_qr_code(current_user: User = Depends(get_current_user)):
             box_size=10,
             border=4,
         )
-        data = str(user_code)
+
+        data = f"{settings.AUTH_API_URL}{settings.AUTH_API_QR_AUTH_PATH}?qr_code_data={user_code}"
         qr.add_data(data)
         qr.make(fit=True)
         img = qr.make_image(fill_color="black", back_color="white")
@@ -81,6 +82,8 @@ async def process_qr_code(qr_code_data: str):
 
         key = f"{settings.QR_AUTH_PREFIX}{qr_code_data}"
         user_email = await redis_client.get(key)
+        await redis_client.delete(key)
+        
         if user_email is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -97,7 +100,9 @@ async def process_qr_code(qr_code_data: str):
         }
         access_token = create_access_token(data=jwt_token_data)
         refresh_token = create_refresh_token(data=jwt_token_data)
+        post_to_url = f"{settings.DATA_COLLECTION_API_URL}{settings.DATA_COLLECTION_API_POST_RAW_DATA_PATH}"
         return {
+            "post_here": post_to_url,
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
@@ -107,5 +112,5 @@ async def process_qr_code(qr_code_data: str):
         # Логирование ошибки можно добавить при необходимости
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка генерации QR-кода: {str(e)}",
+            detail=f"Ошибка получении данных по QR-коду",
         )
