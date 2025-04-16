@@ -9,6 +9,7 @@ from .settings import settings
 
 logger = logging.getLogger("database")
 
+
 class DbEngine:
     def __init__(self):
         self.url = f"{settings.DB_ENGINE}://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"

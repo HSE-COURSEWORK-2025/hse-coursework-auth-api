@@ -5,10 +5,12 @@ import socket
 from pydantic import AnyHttpUrl, validator, EmailStr
 from pydantic_settings import BaseSettings
 
+
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.connect(("8.8.8.8", 80))
 ip = s.getsockname()[0]
 s.close()
+
 
 class Settings(BaseSettings):
     LOG_LEVEL: str = "DEBUG"
@@ -40,22 +42,22 @@ class Settings(BaseSettings):
 
     GOOGLE_REDIRECT_URI: str | None = ""
 
-    REDIS_HOST: str | None  = "localhost"
-    REDIS_PORT: str | None  = "6379"
-    QR_AUTH_PREFIX: str | None ='qr-auth-'
-
+    REDIS_HOST: str | None = "localhost"
+    REDIS_PORT: str | None = "6379"
+    QR_AUTH_PREFIX: str | None = "qr-auth-"
 
     ALGORITHM: str | None = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int | None = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int | None = 7
 
-
     AUTH_API_URL: str | None = f"http://{ip}:8081"
     AUTH_API_QR_AUTH_PATH: str | None = "/auth-api/api/v1/qr_auth/auth_using_qr_code"
-
+    AUTH_API_REFRESH_TOKEN_PATH: str | None = "/auth-api/api/v1/auth/refresh"
 
     DATA_COLLECTION_API_URL: str | None = f"http://{ip}:8082"
-    DATA_COLLECTION_API_POST_RAW_DATA_PATH: str | None = "/data-collection-api/api/v1/post_data/raw_data"
+    DATA_COLLECTION_API_POST_RAW_DATA_PATH: str | None = (
+        "/data-collection-api/api/v1/post_data/raw_data"
+    )
 
     @validator("BACKEND_CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v: str | list[str]) -> str | list[str]:

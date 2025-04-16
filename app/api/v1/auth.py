@@ -15,13 +15,24 @@ from app.settings import settings
 from app.services.db.schemas import User
 from app.services.db.db_session import get_session
 
-from app.models.auth import GoogleAuthRequest, GoogleAuthCodeRequest, GoogleUser, Token, TokenRefreshRequest
-from app.services.auth import get_current_user, verify_google_token, create_access_token, create_refresh_token, create_or_update_user
-
+from app.models.auth import (
+    GoogleAuthRequest,
+    GoogleAuthCodeRequest,
+    GoogleUser,
+    Token,
+    TokenRefreshRequest,
+    TokenData
+)
+from app.services.auth import (
+    get_current_user,
+    verify_google_token,
+    create_access_token,
+    create_refresh_token,
+    create_or_update_user,
+)
 
 
 api_v2_auth_router = APIRouter(prefix="/auth")
-
 
 
 # Эндпоинт аутентификации с использованием Google ID токена (старый вариант)
@@ -48,6 +59,7 @@ async def auth_google(request_data: GoogleAuthRequest):
         "refresh_token": refresh_token,
         "token_type": "bearer",
     }
+
 
 # Новый эндпоинт аутентификации с использованием authorization code
 @api_v2_auth_router.post("/google-code", response_model=Token)
@@ -84,9 +96,9 @@ async def auth_google_code(request_data: GoogleAuthCodeRequest):
     if not id_token_value:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="id_token not found in token response"
+            detail="id_token not found in token response",
         )
-    
+
     # 2. Верификация id_token и получение данных пользователя
     google_user = await verify_google_token(id_token_value)
 
@@ -130,13 +142,13 @@ async def auth_google_code_fitness(request_data: GoogleAuthCodeRequest):
     except httpx.RequestError as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error connecting to Google token endpoint"
+            detail="Error connecting to Google token endpoint",
         )
 
     if token_response.status_code != 200:
         raise HTTPException(
             status_code=token_response.status_code,
-            detail="Error exchanging code for tokens"
+            detail="Error exchanging code for tokens",
         )
 
     # Распаковка ответа от Google, который должен содержать:
@@ -144,7 +156,7 @@ async def auth_google_code_fitness(request_data: GoogleAuthCodeRequest):
     # - refresh_token (если запрошен и доступен)
     # - id_token (который можно использовать для верификации пользователя)
     token_data = token_response.json()
-    
+
     # Если необходимо, можно дополнительно выполнить верификацию id_token и создать/обновить пользователя.
     # Например:
     id_token_value = token_data.get("id_token")
@@ -152,7 +164,7 @@ async def auth_google_code_fitness(request_data: GoogleAuthCodeRequest):
         google_user = await verify_google_token(id_token_value)
         session: Session = await get_session().__anext__()
         create_or_update_user(session, google_user)
-    
+
     # Возвращаем именно токены, полученные от Google.
     return {
         "id_token": token_data.get("id_token"),
@@ -168,7 +180,9 @@ async def refresh_token(refresh_req: TokenRefreshRequest):
     session: Session = await get_session().__anext__()
     try:
         payload = jwt.decode(
-            refresh_req.refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+            refresh_req.refresh_token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
         )
         email: str = payload.get("email")
         if email is None:
@@ -203,7 +217,7 @@ async def refresh_token(refresh_req: TokenRefreshRequest):
 
 
 @api_v2_auth_router.get("/users/me")
-async def read_users_me(current_user: User = Depends(get_current_user)):
+async def read_users_me(current_user: TokenData = Depends(get_current_user)):
     return {
         "google_sub": current_user.google_sub,
         "email": current_user.email,

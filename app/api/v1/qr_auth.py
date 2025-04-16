@@ -15,6 +15,8 @@ from app.models.auth import (
     GoogleUser,
     Token,
     TokenRefreshRequest,
+    QRAuthData,
+    TokenData
 )
 from app.services.auth import (
     get_current_user,
@@ -33,7 +35,7 @@ api_v2_qr_auth_router = APIRouter(prefix="/qr_auth", tags=["qr_auth"])
 
 
 @api_v2_qr_auth_router.get("/get_auth_qr_code", summary="Получение QR кода")
-async def get_qr_code(current_user: User = Depends(get_current_user)):
+async def get_qr_code(current_user: TokenData = Depends(get_current_user)):
     """
     Эндпоинт для генерации QR кода.
 
@@ -71,19 +73,18 @@ async def get_qr_code(current_user: User = Depends(get_current_user)):
         # Логирование ошибки можно добавить при необходимости
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка генерации QR-кода: {str(e)}",
+            detail=f"Ошибка генерации QR-кода",
         )
 
 
 @api_v2_qr_auth_router.get("/auth_using_qr_code", summary="Вход по QR коду")
-async def process_qr_code(qr_code_data: str):
+async def process_qr_code(qr_code_data: str) -> QRAuthData:
     try:
         # Генерация QR кода с использованием библиотеки qrcode
 
         key = f"{settings.QR_AUTH_PREFIX}{qr_code_data}"
         user_email = await redis_client.get(key)
-        await redis_client.delete(key)
-        
+
         if user_email is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -101,12 +102,15 @@ async def process_qr_code(qr_code_data: str):
         access_token = create_access_token(data=jwt_token_data)
         refresh_token = create_refresh_token(data=jwt_token_data)
         post_to_url = f"{settings.DATA_COLLECTION_API_URL}{settings.DATA_COLLECTION_API_POST_RAW_DATA_PATH}"
-        return {
-            "post_here": post_to_url,
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer",
-        }
+        refresh_token_url = f"{settings.AUTH_API_URL}{settings.AUTH_API_REFRESH_TOKEN_PATH}"
+        # await redis_client.delete(key)
+        return QRAuthData(
+            post_here=post_to_url,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            refresh_token_url=refresh_token_url,
+            token_type="bearer",
+        )
 
     except Exception as e:
         # Логирование ошибки можно добавить при необходимости

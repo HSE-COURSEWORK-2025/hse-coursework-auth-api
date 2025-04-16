@@ -4,6 +4,7 @@ from app.settings import settings  # Путь до ваших настроек, 
 
 logger = logging.getLogger(__name__)
 
+
 class RedisClient:
     _instance = None
     _redis = None
@@ -20,8 +21,7 @@ class RedisClient:
         if self._redis is None:
             try:
                 self._redis = await aioredis.from_url(
-                    f"redis://{settings.REDIS_HOST}",
-                    decode_responses=True
+                    f"redis://{settings.REDIS_HOST}", decode_responses=True
                 )
                 logger.info(f"Подключение к Redis: redis://{settings.REDIS_HOST}")
             except Exception as e:
@@ -43,7 +43,9 @@ class RedisClient:
         к объекту redis. Если redis не подключён, генерируется исключение.
         """
         if self._redis is None:
-            raise Exception("Redis не подключен. Вызовите connect() перед использованием.")
+            raise Exception(
+                "Redis не подключен. Вызовите connect() перед использованием."
+            )
         return getattr(self._redis, name)
 
     def __repr__(self):

@@ -20,8 +20,10 @@ from app.services.db.db_session import get_session
 class GoogleAuthRequest(BaseModel):
     token: str  # для старого варианта (ID токен с клиента)
 
+
 class GoogleAuthCodeRequest(BaseModel):
     code: str  # authorization code, полученный через initCodeClient на клиенте
+
 
 class GoogleUser(BaseModel):
     sub: str
@@ -29,11 +31,13 @@ class GoogleUser(BaseModel):
     name: Optional[str] = None
     picture: Optional[str] = None
 
+
 class Token(BaseModel):
     id_token: Optional[str] = None
     access_token: str
     refresh_token: str
     token_type: str
+
 
 class TokenRefreshRequest(BaseModel):
     refresh_token: str
@@ -44,3 +48,11 @@ class TokenData(BaseModel):
     email: str
     name: str
     picture: str
+
+
+class QRAuthData(BaseModel):
+    post_here: str
+    access_token: str
+    refresh_token: str
+    refresh_token_url: str
+    token_type: str
