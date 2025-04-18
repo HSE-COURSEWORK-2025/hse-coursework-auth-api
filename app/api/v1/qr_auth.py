@@ -25,7 +25,7 @@ from app.services.auth import (
     create_refresh_token,
     create_or_update_user,
 )
-from app.services.db.schemas import User
+from app.services.db.schemas import Users
 from app.settings import settings
 from app.services.db.db_session import get_session
 from sqlalchemy.orm import Session
@@ -85,6 +85,11 @@ async def process_qr_code(qr_code_data: str) -> QRAuthData:
         key = f"{settings.QR_AUTH_PREFIX}{qr_code_data}"
         user_email = await redis_client.get(key)
 
+        try:
+            await redis_client.delete(key)
+        except Exception:
+            pass
+        
         if user_email is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -92,7 +97,7 @@ async def process_qr_code(qr_code_data: str) -> QRAuthData:
             )
 
         session: Session = await get_session().__anext__()
-        user = session.query(User).filter(User.email == user_email).first()
+        user = session.query(Users).filter(Users.email == user_email).first()
         jwt_token_data = {
             "google_sub": user.google_sub,
             "email": user.email,

@@ -12,7 +12,7 @@ from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
 
 from app.settings import settings
-from app.services.db.schemas import User
+from app.services.db.schemas import Users, GoogleFitnessAPIAccessTokens, GoogleFitnessAPIRefreshTokens
 from app.services.db.db_session import get_session
 from app.models.auth import (
     GoogleAuthRequest,
@@ -91,11 +91,11 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 
 # Функция для создания/обновления пользователя в БД по данным из Google
-def create_or_update_user(session: Session, google_user: GoogleUser) -> User:
-    db_user = session.query(User).filter(User.google_sub == google_user.sub).first()
+def create_or_update_user(session: Session, google_user: GoogleUser) -> Users:
+    db_user = session.query(Users).filter(Users.google_sub == google_user.sub).first()
     if not db_user:
         # Если пользователь не найден, создаём нового
-        db_user = User(
+        db_user = Users(
             google_sub=google_user.sub,
             email=google_user.email,
             name=google_user.name,
@@ -120,3 +120,44 @@ def create_or_update_user(session: Session, google_user: GoogleUser) -> User:
             session.commit()
             session.refresh(db_user)
     return db_user
+
+
+def create_or_update_user_access_token(session: Session, google_user: GoogleUser, access_token: str) -> Users:
+    if not google_user or not access_token:
+        return
+    
+    db_user = session.query(Users).filter(Users.google_sub == google_user.sub).first()
+    if not db_user:
+        return
+
+    curr_access_token = session.query(GoogleFitnessAPIAccessTokens).filter(GoogleFitnessAPIAccessTokens.user_id == db_user.id).first()
+
+    if not curr_access_token:
+        new_access_token = GoogleFitnessAPIAccessTokens(user_id=db_user.id, token=access_token)
+        session.add(new_access_token)
+        session.commit()
+    else:
+        curr_access_token.token = access_token
+        session.add(curr_access_token)
+        session.commit()
+        session.refresh(curr_access_token)
+
+
+def create_or_update_user_refresh_token(session: Session, google_user: GoogleUser, refresh_token: str) -> Users:
+    if not google_user or not refresh_token:
+        return
+    
+    db_user = session.query(Users).filter(Users.google_sub == google_user.sub).first()
+    if not db_user:
+        return
+
+    curr_refresh_token = session.query(GoogleFitnessAPIRefreshTokens).filter(GoogleFitnessAPIRefreshTokens.user_id == db_user.id).first()
+
+    if not curr_refresh_token:
+        new_refresh_token = GoogleFitnessAPIRefreshTokens(user_id=db_user.id, token=refresh_token)
+        session.add(new_refresh_token)
+        session.commit()
+    else:
+        curr_refresh_token.token = refresh_token
+        session.commit()
+        session.refresh(curr_refresh_token)

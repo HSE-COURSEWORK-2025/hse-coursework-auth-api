@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.settings import settings
-from app.services.db.schemas import User
+from app.services.db.schemas import Users
 from app.services.db.db_session import get_session
 
 
@@ -33,7 +33,6 @@ class GoogleUser(BaseModel):
 
 
 class Token(BaseModel):
-    id_token: Optional[str] = None
     access_token: str
     refresh_token: str
     token_type: str

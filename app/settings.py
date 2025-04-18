@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     AUTH_API_URL: str | None = f"http://{ip}:8081"
     AUTH_API_QR_AUTH_PATH: str | None = "/auth-api/api/v1/qr_auth/auth_using_qr_code"
     AUTH_API_REFRESH_TOKEN_PATH: str | None = "/auth-api/api/v1/auth/refresh"
+    AUTH_API_GET_FRESH_GOOGLE_FITNESS_API_TOKEN_PATH: str | None = "/auth-api/api/v1/internal/users/get_user_google_fitness_api_fresh_access_token"
+    
 
     DATA_COLLECTION_API_URL: str | None = f"http://{ip}:8082"
     DATA_COLLECTION_API_POST_RAW_DATA_PATH: str | None = (
