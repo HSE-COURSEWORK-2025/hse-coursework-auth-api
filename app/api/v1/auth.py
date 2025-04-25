@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.settings import settings
-from app.services.db.schemas import Users
+from app.services.db.schemas import Users, UserIntegrations, IntegrationSource
 from app.services.db.db_session import get_session
 
 from app.models.auth import (
@@ -21,7 +21,7 @@ from app.models.auth import (
     GoogleUser,
     Token,
     TokenRefreshRequest,
-    TokenData
+    TokenData,
 )
 from app.services.auth import (
     get_current_user,
@@ -30,15 +30,15 @@ from app.services.auth import (
     create_refresh_token,
     create_or_update_user,
     create_or_update_user_access_token,
-    create_or_update_user_refresh_token
+    create_or_update_user_refresh_token,
 )
 
 
-api_v2_auth_router = APIRouter(prefix="/auth")
+api_v1_auth_router = APIRouter(prefix="/auth")
 
 
 # Эндпоинт аутентификации с использованием Google ID токена (старый вариант)
-@api_v2_auth_router.post("/google", response_model=Token)
+@api_v1_auth_router.post("/google", response_model=Token)
 async def auth_google(request_data: GoogleAuthRequest):
     session: Session = await get_session().__anext__()
 
@@ -63,24 +63,25 @@ async def auth_google(request_data: GoogleAuthRequest):
     }
 
 
-@api_v2_auth_router.post("/google-code-fitness", response_model=Token)
+@api_v1_auth_router.post("/google-code-fitness", response_model=Token)
 async def auth_google_code_fitness(request_data: GoogleAuthCodeRequest):
     """
-    Эндпоинт для обмена authorization code на токены Google,
-    предназначенные для работы с Google Fitness API.
+    Эндпоинт для обмена authorization code на токены Google Fitness API
+    и создания записи об интеграции google_fitness_api.
     """
+    # 1) Обмениваем код на токены у Google
     token_endpoint = "https://oauth2.googleapis.com/token"
     payload = {
         "code": request_data.code,
         "client_id": settings.GOOGLE_CLIENT_ID,
-        "client_secret": settings.GOOGLE_CLIENT_SECRET,  # Используйте отдельное значение для Google Client Secret
+        "client_secret": settings.GOOGLE_CLIENT_SECRET,
         "redirect_uri": settings.GOOGLE_REDIRECT_URI,
         "grant_type": "authorization_code",
     }
     try:
         async with httpx.AsyncClient() as client:
             token_response = await client.post(token_endpoint, data=payload)
-    except httpx.RequestError as exc:
+    except httpx.RequestError:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error connecting to Google token endpoint",
@@ -92,33 +93,59 @@ async def auth_google_code_fitness(request_data: GoogleAuthCodeRequest):
             detail="Error exchanging code for tokens",
         )
 
-    # Распаковка ответа от Google, который должен содержать:
-    # - access_token (для доступа к Google Fitness API)
-    # - refresh_token (если запрошен и доступен)
-    # - id_token (который можно использовать для верификации пользователя)
     token_data = token_response.json()
 
-    # Если необходимо, можно дополнительно выполнить верификацию id_token и создать/обновить пользователя.
-    # Например:
+    # 2) Верифицируем id_token и получаем данные пользователя
     id_token_value = token_data.get("id_token")
-    if id_token_value:
-        google_user = await verify_google_token(id_token_value)
-        session: Session = await get_session().__anext__()
-        create_or_update_user(session, google_user)
-        create_or_update_user_access_token(session, google_user, token_data.get("access_token"))
-        create_or_update_user_refresh_token(session, google_user, token_data.get("refresh_token"))
+    if not id_token_value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing id_token in Google response",
+        )
+    google_user = await verify_google_token(id_token_value)
 
-    google_user_dict = google_user.model_dump()
-    access_token = create_access_token(data=google_user_dict)
-    refresh_token = create_refresh_token(data=google_user_dict)
+    # 3) Открываем сессию и создаём/обновляем пользователя и его токены
+    session: Session = await get_session().__anext__()
+    db_user = create_or_update_user(session, google_user)
+    create_or_update_user_access_token(
+        session, google_user, token_data.get("access_token")
+    )
+    create_or_update_user_refresh_token(
+        session, google_user, token_data.get("refresh_token")
+    )
 
-    user = session.query(Users).filter(Users.email == google_user.email).first()
-    user.need_to_refresh_google_api_token = False
-    session.add(user)
+    # 4) Отмечаем, что токен не нужно рефрешить
+    db_user.need_to_refresh_google_api_token = False
+    session.add(db_user)
+
+    # 5) Регистрируем интеграцию Google Fitness API
+    exists = (
+        session.query(UserIntegrations)
+        .filter_by(user_id=db_user.id, source=IntegrationSource.google_fitness_api)
+        .first()
+    )
+    if not exists:
+        integration = UserIntegrations(
+            user_id=db_user.id,
+            source=IntegrationSource.google_fitness_api,
+            connected_at=datetime.utcnow(),
+        )
+        session.add(integration)
+
+    # 6) Сохраняем всё в БД
     session.commit()
-    session.refresh(user)
+    session.refresh(db_user)
 
-    # Возвращаем именно токены, полученные от Google.
+    # 7) Генерируем JWT для клиента
+    jwt_payload = {
+        "google_sub": db_user.google_sub,
+        "email": db_user.email,
+        "name": db_user.name,
+        "picture": db_user.picture,
+    }
+    access_token = create_access_token(data=jwt_payload)
+    refresh_token = create_refresh_token(data=jwt_payload)
+
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -127,7 +154,7 @@ async def auth_google_code_fitness(request_data: GoogleAuthCodeRequest):
 
 
 # Эндпоинт обновления токенов нашего приложения
-@api_v2_auth_router.post("/refresh", response_model=Token)
+@api_v1_auth_router.post("/refresh", response_model=Token)
 async def refresh_token(refresh_req: TokenRefreshRequest):
     session: Session = await get_session().__anext__()
     try:
@@ -146,13 +173,13 @@ async def refresh_token(refresh_req: TokenRefreshRequest):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         )
-    
+
     user = session.query(Users).filter(Users.email == email).first()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
         )
-    
+
     if user.need_to_refresh_google_api_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
@@ -173,7 +200,7 @@ async def refresh_token(refresh_req: TokenRefreshRequest):
     }
 
 
-@api_v2_auth_router.get("/users/me")
+@api_v1_auth_router.get("/users/me")
 async def read_users_me(current_user: TokenData = Depends(get_current_user)):
     return {
         "google_sub": current_user.google_sub,

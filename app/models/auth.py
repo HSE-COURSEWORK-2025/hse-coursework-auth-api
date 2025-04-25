@@ -55,3 +55,4 @@ class QRAuthData(BaseModel):
     refresh_token: str
     refresh_token_url: str
     token_type: str
+    email: str

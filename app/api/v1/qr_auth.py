@@ -1,14 +1,19 @@
+# app/api/v2/qr_auth.py
+
 import io
 from typing import Optional
-
 import qrcode
+from uuid import uuid4
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-
-from uuid import uuid4
 from app.services.redis.engine import redis_client
+from app.services.db.db_session import get_session
+from app.services.db.schemas import Users, UserIntegrations, IntegrationSource
+
 from app.models.auth import (
     GoogleAuthRequest,
     GoogleAuthCodeRequest,
@@ -16,25 +21,20 @@ from app.models.auth import (
     Token,
     TokenRefreshRequest,
     QRAuthData,
-    TokenData
+    TokenData,
 )
 from app.services.auth import (
     get_current_user,
     verify_google_token,
     create_access_token,
     create_refresh_token,
-    create_or_update_user,
 )
-from app.services.db.schemas import Users
 from app.settings import settings
-from app.services.db.db_session import get_session
-from sqlalchemy.orm import Session
+
+api_v1_qr_auth_router = APIRouter(prefix="/qr_auth", tags=["qr_auth"])
 
 
-api_v2_qr_auth_router = APIRouter(prefix="/qr_auth", tags=["qr_auth"])
-
-
-@api_v2_qr_auth_router.get("/get_auth_qr_code", summary="Получение QR кода")
+@api_v1_qr_auth_router.get("/get_auth_qr_code", summary="Получение QR кода")
 async def get_qr_code(current_user: TokenData = Depends(get_current_user)):
     """
     Эндпоинт для генерации QR кода.
@@ -43,12 +43,9 @@ async def get_qr_code(current_user: TokenData = Depends(get_current_user)):
     - **size**: (опционально) Размер изображения в пикселях.
     """
     try:
-        # Генерация QR кода с использованием библиотеки qrcode
-
         user_code = uuid4()
         user_email = current_user.email
         key = f"{settings.QR_AUTH_PREFIX}{user_code}"
-
         await redis_client.set(key, user_email)
 
         qr = qrcode.QRCode(
@@ -57,69 +54,93 @@ async def get_qr_code(current_user: TokenData = Depends(get_current_user)):
             box_size=10,
             border=4,
         )
-
         data = f"{settings.AUTH_API_URL}{settings.AUTH_API_QR_AUTH_PATH}?qr_code_data={user_code}"
         qr.add_data(data)
         qr.make(fit=True)
         img = qr.make_image(fill_color="black", back_color="white")
 
-        # Формирование ответа в виде потока байтов
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         buf.seek(0)
         return StreamingResponse(buf, media_type="image/png")
 
-    except Exception as e:
-        # Логирование ошибки можно добавить при необходимости
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка генерации QR-кода",
+            detail="Ошибка генерации QR-кода",
         )
 
 
-@api_v2_qr_auth_router.get("/auth_using_qr_code", summary="Вход по QR коду")
+@api_v1_qr_auth_router.get("/auth_using_qr_code", summary="Вход по QR коду")
 async def process_qr_code(qr_code_data: str) -> QRAuthData:
+    """
+    Обрабатывает одноразовый код из QR.
+    1) Читает email из Redis
+    2) Удаляет ключ
+    3) Вытаскивает пользователя из БД
+    4) Добавляет запись в user_integrations с source=google_health_api
+    5) Возвращает токены
+    """
     try:
-        # Генерация QR кода с использованием библиотеки qrcode
-
+        # 1) Достаём email из Redis
         key = f"{settings.QR_AUTH_PREFIX}{qr_code_data}"
         user_email = await redis_client.get(key)
+        await redis_client.delete(key)
 
-        try:
-            await redis_client.delete(key)
-        except Exception:
-            pass
-        
         if user_email is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Неверные данные QR-кода: {str(e)}",
+                detail="Неверные данные QR-кода",
             )
 
+        # 2) Берём сессию и пользователя
         session: Session = await get_session().__anext__()
         user = session.query(Users).filter(Users.email == user_email).first()
-        jwt_token_data = {
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Пользователь не найден",
+            )
+
+        # 3) Регистрируем интеграцию Google Health API
+        exists = (
+            session.query(UserIntegrations)
+            .filter_by(user_id=user.id, source=IntegrationSource.google_health_api)
+            .first()
+        )
+        if not exists:
+            integration = UserIntegrations(
+                user_id=user.id,
+                source=IntegrationSource.google_health_api,
+                connected_at=datetime.utcnow(),
+            )
+            session.add(integration)
+            session.commit()
+
+        # 4) Генерируем токены
+        jwt_data = {
             "google_sub": user.google_sub,
             "email": user.email,
             "name": user.name,
             "picture": user.picture,
         }
-        access_token = create_access_token(data=jwt_token_data)
-        refresh_token = create_refresh_token(data=jwt_token_data)
-        post_to_url = f"{settings.DATA_COLLECTION_API_URL}{settings.DATA_COLLECTION_API_POST_RAW_DATA_PATH}"
-        refresh_token_url = f"{settings.AUTH_API_URL}{settings.AUTH_API_REFRESH_TOKEN_PATH}"
-        # await redis_client.delete(key)
+        access_token = create_access_token(data=jwt_data)
+        refresh_token = create_refresh_token(data=jwt_data)
+
+        # 5) Формируем ответ
         return QRAuthData(
-            post_here=post_to_url,
+            post_here=f"{settings.DATA_COLLECTION_API_URL}{settings.DATA_COLLECTION_API_POST_RAW_DATA_PATH}",
             access_token=access_token,
             refresh_token=refresh_token,
-            refresh_token_url=refresh_token_url,
+            refresh_token_url=f"{settings.AUTH_API_URL}{settings.AUTH_API_REFRESH_TOKEN_PATH}",
             token_type="bearer",
+            email=user.email,
         )
 
-    except Exception as e:
-        # Логирование ошибки можно добавить при необходимости
+    except HTTPException:
+        raise
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получении данных по QR-коду",
+            detail="Ошибка получении данных по QR-коду",
         )
