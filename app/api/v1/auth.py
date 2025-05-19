@@ -78,6 +78,9 @@ async def auth_google_code_fitness(request_data: GoogleAuthCodeRequest):
         "redirect_uri": settings.GOOGLE_REDIRECT_URI,
         "grant_type": "authorization_code",
     }
+
+    logging.info(f'payload: {payload}')
+
     try:
         async with httpx.AsyncClient() as client:
             token_response = await client.post(token_endpoint, data=payload)

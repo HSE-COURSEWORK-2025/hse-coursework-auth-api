@@ -45,7 +45,7 @@ async def get_qr_code(current_user: TokenData = Depends(get_current_user)):
     try:
         user_code = uuid4()
         user_email = current_user.email
-        key = f"{settings.QR_AUTH_PREFIX}{user_code}"
+        key = f"{settings.QR_AUTH_REDIS_PREFIX}{user_code}"
         await redis_client.set(key, user_email)
 
         qr = qrcode.QRCode(
@@ -54,7 +54,7 @@ async def get_qr_code(current_user: TokenData = Depends(get_current_user)):
             box_size=10,
             border=4,
         )
-        data = f"{settings.AUTH_API_URL}{settings.AUTH_API_QR_AUTH_PATH}?qr_code_data={user_code}"
+        data = f"{settings.DOMAIN_NAME}{settings.AUTH_API_QR_AUTH_PATH}?qr_code_data={user_code}"
         qr.add_data(data)
         qr.make(fit=True)
         img = qr.make_image(fill_color="black", back_color="white")
@@ -83,7 +83,7 @@ async def process_qr_code(qr_code_data: str) -> QRAuthData:
     """
     try:
         # 1) Достаём email из Redis
-        key = f"{settings.QR_AUTH_PREFIX}{qr_code_data}"
+        key = f"{settings.QR_AUTH_REDIS_PREFIX}{qr_code_data}"
         user_email = await redis_client.get(key)
         await redis_client.delete(key)
 
@@ -129,10 +129,10 @@ async def process_qr_code(qr_code_data: str) -> QRAuthData:
 
         # 5) Формируем ответ
         return QRAuthData(
-            post_here=f"{settings.DATA_COLLECTION_API_URL}{settings.DATA_COLLECTION_API_POST_RAW_DATA_PATH}",
+            post_here=f"{settings.DOMAIN_NAME}{settings.DATA_COLLECTION_API_POST_RAW_DATA_PATH}",
             access_token=access_token,
             refresh_token=refresh_token,
-            refresh_token_url=f"{settings.AUTH_API_URL}{settings.AUTH_API_REFRESH_TOKEN_PATH}",
+            refresh_token_url=f"{settings.DOMAIN_NAME}{settings.AUTH_API_REFRESH_TOKEN_PATH}",
             token_type="bearer",
             email=user.email,
         )

@@ -47,8 +47,8 @@ async def get_all_users():
     users = session.query(Users).all()
 
     # Соберём базовый URL до параметров
-    google_fitness_api_token_url = f"{settings.AUTH_API_URL}{settings.AUTH_API_GET_GOOGLE_FITNESS_API_TOKEN_PATH}"
-    access_token_url = f"{settings.AUTH_API_URL}{settings.AUTH_API_GET_ACCESS_TOKEN_PATH}"
+    google_fitness_api_token_url = f"{settings.DOMAIN_NAME}{settings.AUTH_API_GET_GOOGLE_FITNESS_API_TOKEN_PATH}"
+    access_token_url = f"{settings.DOMAIN_NAME}{settings.AUTH_API_GET_ACCESS_TOKEN_PATH}"
 
     result = []
     for user in users:
