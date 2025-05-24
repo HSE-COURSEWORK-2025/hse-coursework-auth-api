@@ -10,6 +10,7 @@ from google.auth.transport import requests as google_requests
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.settings import settings
 from app.services.db.schemas import Users, UserIntegrations, IntegrationSource
@@ -210,4 +211,37 @@ async def read_users_me(current_user: TokenData = Depends(get_current_user)):
         "email": current_user.email,
         "name": current_user.name,
         "picture": current_user.picture,
+    }
+
+
+@api_v1_auth_router.get("/get-test-account", response_model=Token)
+async def get_test_account():
+    session: Session = await get_session().__anext__()
+   
+   
+    # 5) Регистрируем интеграцию Google Fitness API
+    result = session.execute(
+        select(Users).where(Users.email == "awesomecosmonaut@gmail.com")
+    )
+    test_user = result.scalar_one_or_none()
+    if not test_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Test user not found"
+        )
+
+    # 7) Генерируем JWT для клиента
+    jwt_payload = {
+        "google_sub": test_user.google_sub,
+        "email": test_user.email,
+        "name": test_user.name,
+        "picture": test_user.picture,
+    }
+    access_token = create_access_token(data=jwt_payload)
+    refresh_token = create_refresh_token(data=jwt_payload)
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
     }
