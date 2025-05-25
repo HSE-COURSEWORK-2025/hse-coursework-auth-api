@@ -17,7 +17,7 @@ from app.services.db.db_session import get_session
 from app.models.auth import (
     GoogleAuthRequest,
     GoogleAuthCodeRequest,
-    GoogleUser,
+    GlobalUser,
     Token,
     TokenRefreshRequest,
     TokenData,
@@ -46,18 +46,19 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenData:
 
 
 # Функция верификации гугловского ID токена
-async def verify_google_token(token: str) -> GoogleUser:
+async def verify_google_token(token: str) -> GlobalUser:
     try:
         idinfo = google_id_token.verify_oauth2_token(
             token, google_requests.Request(), settings.GOOGLE_CLIENT_ID
         )
         if idinfo["iss"] not in ["accounts.google.com", "https://accounts.google.com"]:
             raise ValueError("Invalid issuer.")
-        return GoogleUser(
+        return GlobalUser(
             sub=idinfo.get("sub"),
             email=idinfo.get("email"),
             name=idinfo.get("name"),
             picture=idinfo.get("picture"),
+            test_user=False
         )
     except ValueError:
         raise HTTPException(
@@ -91,7 +92,7 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 
 # Функция для создания/обновления пользователя в БД по данным из Google
-def create_or_update_user(session: Session, google_user: GoogleUser) -> Users:
+def create_or_update_user(session: Session, google_user: GlobalUser) -> Users:
     db_user = session.query(Users).filter(Users.google_sub == google_user.sub).first()
     if not db_user:
         # Если пользователь не найден, создаём нового
@@ -100,6 +101,7 @@ def create_or_update_user(session: Session, google_user: GoogleUser) -> Users:
             email=google_user.email,
             name=google_user.name,
             picture=google_user.picture,
+            test_user=google_user.test_user
         )
         session.add(db_user)
         session.commit()
@@ -122,7 +124,7 @@ def create_or_update_user(session: Session, google_user: GoogleUser) -> Users:
     return db_user
 
 
-def create_or_update_user_access_token(session: Session, google_user: GoogleUser, access_token: str) -> Users:
+def create_or_update_user_access_token(session: Session, google_user: GlobalUser, access_token: str) -> Users:
     if not google_user or not access_token:
         return
     
@@ -143,7 +145,7 @@ def create_or_update_user_access_token(session: Session, google_user: GoogleUser
         session.refresh(curr_access_token)
 
 
-def create_or_update_user_refresh_token(session: Session, google_user: GoogleUser, refresh_token: str) -> Users:
+def create_or_update_user_refresh_token(session: Session, google_user: GlobalUser, refresh_token: str) -> Users:
     if not google_user or not refresh_token:
         return
     

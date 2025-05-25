@@ -17,7 +17,7 @@ from app.services.db.schemas import Users, UserIntegrations, IntegrationSource
 from app.models.auth import (
     GoogleAuthRequest,
     GoogleAuthCodeRequest,
-    GoogleUser,
+    GlobalUser,
     Token,
     TokenRefreshRequest,
     QRAuthData,
@@ -123,6 +123,7 @@ async def process_qr_code(qr_code_data: str) -> QRAuthData:
             "email": user.email,
             "name": user.name,
             "picture": user.picture,
+            "test_user": False
         }
         access_token = create_access_token(data=jwt_data)
         refresh_token = create_refresh_token(data=jwt_data)

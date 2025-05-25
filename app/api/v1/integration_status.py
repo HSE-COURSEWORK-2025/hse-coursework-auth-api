@@ -17,7 +17,7 @@ from app.services.db.schemas import Users, UserIntegrations, IntegrationSource
 from app.models.auth import (
     GoogleAuthRequest,
     GoogleAuthCodeRequest,
-    GoogleUser,
+    GlobalUser,
     Token,
     TokenRefreshRequest,
     QRAuthData,

@@ -33,6 +33,7 @@ class Users(Base):
         default=False,
         server_default=expression.false(),
     )
+    test_user = Column(Boolean, default=False, nullable=False)
 
     # One-to-one связь: у пользователя один access и один refresh токен
     google_fitness_api_access_token = relationship(

@@ -18,7 +18,7 @@ from app.services.db.db_session import get_session
 from app.models.auth import (
     GoogleAuthRequest,
     GoogleAuthCodeRequest,
-    GoogleUser,
+    GlobalUser,
     Token,
     TokenRefreshRequest,
     TokenData,

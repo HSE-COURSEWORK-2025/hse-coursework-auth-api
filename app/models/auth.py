@@ -25,11 +25,12 @@ class GoogleAuthCodeRequest(BaseModel):
     code: str  # authorization code, полученный через initCodeClient на клиенте
 
 
-class GoogleUser(BaseModel):
+class GlobalUser(BaseModel):
     sub: str
     email: str
     name: Optional[str] = None
     picture: Optional[str] = None
+    test_user: Optional[bool] = None
 
 
 class Token(BaseModel):
@@ -47,6 +48,7 @@ class TokenData(BaseModel):
     email: str
     name: str
     picture: str
+    test_user: Optional[bool] = False
 
 
 class QRAuthData(BaseModel):

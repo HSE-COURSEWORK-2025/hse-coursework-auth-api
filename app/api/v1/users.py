@@ -18,7 +18,7 @@ from app.services.db.db_session import get_session
 from app.models.auth import (
     GoogleAuthRequest,
     GoogleAuthCodeRequest,
-    GoogleUser,
+    GlobalUser,
     TokenRefreshRequest,
     TokenData,
 )
@@ -129,6 +129,7 @@ async def get_user_auth_token(email: str):
         "email": user.email,
         "name": user.name,
         "picture": user.picture,
+        "test_user": False
     }
     new_access_token = create_access_token(data=token_data)
     new_refresh_token = create_refresh_token(data=token_data)

@@ -10,7 +10,7 @@ from google.auth.transport import requests as google_requests
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.settings import settings
 from app.services.db.schemas import Users, UserIntegrations, IntegrationSource
@@ -19,7 +19,7 @@ from app.services.db.db_session import get_session
 from app.models.auth import (
     GoogleAuthRequest,
     GoogleAuthCodeRequest,
-    GoogleUser,
+    GlobalUser,
     Token,
     TokenRefreshRequest,
     TokenData,
@@ -36,32 +36,6 @@ from app.services.auth import (
 
 
 api_v1_auth_router = APIRouter(prefix="/auth")
-
-
-# Эндпоинт аутентификации с использованием Google ID токена (старый вариант)
-@api_v1_auth_router.post("/google", response_model=Token)
-async def auth_google(request_data: GoogleAuthRequest):
-    session: Session = await get_session().__anext__()
-
-    # Верификация гугловского ID токена
-    google_user = await verify_google_token(request_data.token)
-
-    db_user = create_or_update_user(session, google_user)
-
-    # Формирование данных для JWT нашего приложения
-    token_data = {
-        "google_sub": db_user.google_sub,
-        "email": db_user.email,
-        "name": db_user.name,
-        "picture": db_user.picture,
-    }
-    access_token = create_access_token(data=token_data)
-    refresh_token = create_refresh_token(data=token_data)
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-    }
 
 
 @api_v1_auth_router.post("/google-code-fitness", response_model=Token)
@@ -146,6 +120,7 @@ async def auth_google_code_fitness(request_data: GoogleAuthCodeRequest):
         "email": db_user.email,
         "name": db_user.name,
         "picture": db_user.picture,
+        "test_user": db_user.test_user
     }
     access_token = create_access_token(data=jwt_payload)
     refresh_token = create_refresh_token(data=jwt_payload)
@@ -194,6 +169,7 @@ async def refresh_token(refresh_req: TokenRefreshRequest):
         "email": user.email,
         "name": user.name,
         "picture": user.picture,
+        "test_user": user.test_user
     }
     new_access_token = create_access_token(data=token_data)
     new_refresh_token = create_refresh_token(data=token_data)
@@ -211,37 +187,53 @@ async def read_users_me(current_user: TokenData = Depends(get_current_user)):
         "email": current_user.email,
         "name": current_user.name,
         "picture": current_user.picture,
+        "test_user": current_user.test_user
     }
 
 
 @api_v1_auth_router.get("/get-test-account", response_model=Token)
 async def get_test_account():
     session: Session = await get_session().__anext__()
-   
-   
-    # 5) Регистрируем интеграцию Google Fitness API
-    result = session.execute(
-        select(Users).where(Users.email == "awesomecosmonaut@gmail.com")
-    )
-    test_user = result.scalar_one_or_none()
-    if not test_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Test user not found"
-        )
 
-    # 7) Генерируем JWT для клиента
+    # 1) Считаем количество уже существующих тестовых пользователей
+    count_stmt = select(func.count()).select_from(Users).where(Users.test_user == True)
+    result = session.execute(count_stmt)
+    test_count = result.scalar_one() or 0
+
+    # 2) Формируем уникальные данные для нового тестового пользователя
+    new_index = test_count + 1
+    test_email = f"test{new_index}@test.com"
+    test_name  = f"Test User {new_index}"
+    test_sub   = f"test-sub-{new_index}"
+    test_picture = "https://img.redro.pl/obrazy/user-icon-human-person-symbol-avatar-login-sign-400-260853306.jpg"
+
+    # 3) Создаём или обновляем запись
+    #    Предполагается, что create_or_update_user умеет устанавливать flag test_user
+    google_user = GlobalUser(
+        sub=test_sub,
+        email=test_email,
+        name=test_name,
+        picture=test_picture,
+        test_user=True,
+    )
+    db_user = create_or_update_user(session, google_user)
+
+    # 4) Сохраняем изменения
+    session.commit()
+
+    # 5) Генерируем JWT для клиента
     jwt_payload = {
-        "google_sub": test_user.google_sub,
-        "email": test_user.email,
-        "name": test_user.name,
-        "picture": test_user.picture,
+        "google_sub": db_user.google_sub,
+        "email":      db_user.email,
+        "name":       db_user.name,
+        "picture":    db_user.picture,
+        "test_user": db_user.test_user
     }
-    access_token = create_access_token(data=jwt_payload)
+    access_token  = create_access_token(data=jwt_payload)
     refresh_token = create_refresh_token(data=jwt_payload)
 
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-    }
+    return Token(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+    )
