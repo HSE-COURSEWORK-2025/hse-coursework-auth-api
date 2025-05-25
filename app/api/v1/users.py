@@ -44,7 +44,7 @@ api_v1_user_info_router = APIRouter(prefix="/internal/users")
 @api_v1_user_info_router.get("/get_all_users")
 async def get_all_users():
     session: Session = await get_session().__anext__()
-    users = session.query(Users).all()
+    users = session.query(Users).filter(Users.test_user==False).all()
 
     # Соберём базовый URL до параметров
     google_fitness_api_token_url = f"{settings.DOMAIN_NAME}{settings.AUTH_API_GET_GOOGLE_FITNESS_API_TOKEN_PATH}"
