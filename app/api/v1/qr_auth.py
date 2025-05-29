@@ -30,6 +30,9 @@ from app.services.auth import (
     create_refresh_token,
 )
 from app.settings import settings
+from fastapi.responses import FileResponse
+import os
+
 
 api_v1_qr_auth_router = APIRouter(prefix="/qr_auth", tags=["qr_auth"])
 
@@ -145,3 +148,14 @@ async def process_qr_code(qr_code_data: str) -> QRAuthData:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Ошибка получении данных по QR-коду",
         )
+
+
+@api_v1_qr_auth_router.get("/get_app_qr_code", summary="Получение QR кода для скачивания приложения")
+async def get_app_download_qr_code():
+    file_path = "./qr_app_link.png"
+    if not os.path.isfile(file_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="QR-код не найден"
+        )
+    return FileResponse(path=file_path, media_type="image/png")
