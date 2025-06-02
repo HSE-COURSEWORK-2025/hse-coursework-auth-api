@@ -1,22 +1,21 @@
 # app/api/v2/qr_auth.py
 
 import io
-from typing import Optional
+from typing import List
 import qrcode
 from uuid import uuid4
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.redis.engine import redis_client
 from app.services.db.db_session import get_session
 from app.services.db.schemas import Users, UserIntegrations, IntegrationSource
 
 from app.models.auth import (
-    GoogleAuthRequest,
-    GoogleAuthCodeRequest,
     GlobalUser,
     Token,
     TokenRefreshRequest,
@@ -31,10 +30,7 @@ from app.services.auth import (
 )
 from app.settings import settings
 
-from typing import List
 from pydantic import BaseModel
-from datetime import datetime
-from fastapi import Depends
 
 
 api_v1_integrations_router = APIRouter(prefix="/integrations", tags=["integrations"])
@@ -56,22 +52,29 @@ class IntegrationOut(BaseModel):
 )
 async def get_user_integrations(
     current_user: TokenData = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> List[IntegrationOut]:
     """
     Возвращает все подключения (источники) для авторизованного пользователя.
     """
-    session: Session = await get_session().__anext__()
-
-    db_user = (
-        session.query(Users)
-        .filter(Users.google_sub == current_user.google_sub)
-        .first()
-    )
+    # Находим пользователя по google_sub
+    stmt_user = select(Users).where(Users.google_sub == current_user.google_sub)
+    result_user = await session.execute(stmt_user)
+    db_user = result_user.scalar_one_or_none()
 
     if not db_user:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Пользователь не найден",
         )
 
-    return db_user.integrations
+    # Загружаем интеграции этого пользователя
+    stmt_integr = (
+        select(UserIntegrations)
+        .where(UserIntegrations.user_id == db_user.id)
+        .order_by(UserIntegrations.connected_at)
+    )
+    result_int = await session.execute(stmt_integr)
+    integrations = result_int.scalars().all()
+
+    return integrations
