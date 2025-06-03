@@ -200,7 +200,7 @@ async def get_test_account(
         sub=f"test-sub-{new_index}",
         email=f"test{new_index}@test.com",
         name=f"Test User {new_index}",
-        picture="https://img.redro.pl/obrazy/user-icon-human-person-symbol-avatar-login-sign-400-260853306.jpg",
+        picture="https://avatar.iran.liara.run/public",
         test_user=True,
     )
 
