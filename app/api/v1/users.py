@@ -21,8 +21,16 @@ api_v1_user_info_router = APIRouter(prefix="/internal/users")
 
 # Получить всех пользователей
 @api_v1_user_info_router.get("/get_all_users")
-async def get_all_users(session: AsyncSession = Depends(get_session)):
-    q = select(Users).where(Users.test_user == False)
+async def get_all_users(session: AsyncSession = Depends(get_session), test_users: bool=False, real_users: bool=True):
+    if test_users and real_users:
+        q = select(Users)
+    
+    elif (real_users and not test_users) or (not real_users and test_users):
+        q = select(Users).where(Users.test_user == test_users)
+
+    else:
+        raise HTTPException(status_code=404, detail="Users not found")
+
     result = await session.execute(q)
     users = result.scalars().all()
 
