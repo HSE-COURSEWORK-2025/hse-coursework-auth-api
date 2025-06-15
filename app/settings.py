@@ -64,8 +64,8 @@ class Settings(BaseSettings):
         raise ValueError(v)
 
     class Config:
-        # env_file = ".env"
-        env_file = ".env.development"
+        env_file = ".env"
+        # env_file = ".env.development"
         env_file_encoding = "utf-8"
         case_sensitive = False
         env_nested_delimiter = "__"
