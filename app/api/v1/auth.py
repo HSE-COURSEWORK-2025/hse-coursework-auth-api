@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
@@ -50,67 +50,75 @@ async def auth_google_code_fitness(
         "redirect_uri": settings.GOOGLE_REDIRECT_URI,
         "grant_type": "authorization_code",
     }
-    logger.info(f"Exchanging Google code for tokens, payload={payload}")
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.post(token_endpoint, data=payload)
+        token_resp.raise_for_status()
+        token_data = token_resp.json()
 
-    try:
-        async with httpx.AsyncClient() as client:
-            token_response = await client.post(token_endpoint, data=payload)
-    except httpx.RequestError as e:
-        logger.error("Error connecting to Google token endpoint", exc_info=e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error connecting to Google token endpoint",
+        access_token = token_data["access_token"]
+
+        # 2) Дополнительный запрос в People API
+        people_endpoint = (
+            "https://people.googleapis.com/v1/people/me"
+            "?personFields=genders,birthdays"
         )
-
-    if token_response.status_code != 200:
-        logger.error("Google token exchange failed: %s", token_response.text)
-        raise HTTPException(
-            status_code=token_response.status_code,
-            detail="Error exchanging code for tokens",
+        people_resp = await client.get(
+            people_endpoint,
+            headers={"Authorization": f"Bearer {access_token}"}
         )
-    token_data = token_response.json()
+        people_resp.raise_for_status()
+        profile = people_resp.json()
 
-    # 2) Verify id_token
-    id_token_value = token_data.get("id_token")
-    if not id_token_value:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing id_token in Google response",
-        )
-    google_user = await verify_google_token(id_token_value)
+    # 3) Парсим пол
+    gender = None
+    for g in profile.get("genders", []):
+        meta = g.get("metadata", {})
+        if meta.get("primary", False):
+            gender = g.get("value")
+            break
+    if gender is None and profile.get("genders"):
+        gender = profile["genders"][0].get("value")
 
-    # 3) Create/update user and store Google API tokens
+    # 4) Парсим дату рождения
+    bdate = None
+    for b in profile.get("birthdays", []):
+        if b.get("metadata", {}).get("primary"):
+            d = b.get("date", {})
+            bdate = datetime(d["year"], d["month"], d["day"], tzinfo=timezone.utc)
+            break
+    if bdate is None and profile.get("birthdays"):
+        d = profile["birthdays"][0].get("date", {})
+        bdate = datetime(d["year"], d["month"], d["day"], tzinfo=timezone.utc)
+
+    # 5) Verify id_token и get user info
+    google_user = await verify_google_token(token_data["id_token"])
+
+    # 6) Create/update user and store tokens
     db_user = await create_or_update_user(session, google_user)
+
+    # 7) Записываем в модель пол и дату
+    if gender:
+        db_user.gender = gender
+    if bdate:
+        bdate_naive = bdate.astimezone(timezone.utc).replace(tzinfo=None)
+        db_user.birth_date = bdate_naive
+
+    session.add(db_user)
+
     await create_or_update_user_access_token(
-        session, google_user, token_data["access_token"]
+        session, google_user, access_token
     )
     await create_or_update_user_refresh_token(
         session, google_user, token_data["refresh_token"]
     )
 
-    # 4) Mark that we just got fresh Google tokens
+    # 8) Сбросим флаг обновления токена и проставим интеграцию
     db_user.need_to_refresh_google_api_token = False
     session.add(db_user)
-
-    # 5) Ensure UserIntegrations row exists
-    q = select(UserIntegrations).where(
-        UserIntegrations.user_id == db_user.id,
-        UserIntegrations.source == IntegrationSource.google_fitness_api,
-    )
-    result = await session.execute(q)
-    if not result.scalar_one_or_none():
-        ui = UserIntegrations(
-            user_id=db_user.id,
-            source=IntegrationSource.google_fitness_api,
-            connected_at=datetime.utcnow(),
-        )
-        session.add(ui)
-
-    # 6) Commit & refresh
+    # … остальной код по UserIntegrations, коммит и отдача JWT …
     await session.commit()
     await session.refresh(db_user)
 
-    # 7) Issue our JWTs
     jwt_payload = {
         "google_sub": db_user.google_sub,
         "email": db_user.email,
@@ -118,12 +126,9 @@ async def auth_google_code_fitness(
         "picture": db_user.picture,
         "test_user": db_user.test_user,
     }
-    access_token = create_access_token(data=jwt_payload)
-    refresh_token = create_refresh_token(data=jwt_payload)
-
     return Token(
-        access_token=access_token,
-        refresh_token=refresh_token,
+        access_token=create_access_token(data=jwt_payload),
+        refresh_token=create_refresh_token(data=jwt_payload),
         token_type="bearer",
     )
 

@@ -1,7 +1,7 @@
 # app/models.py
 
 import enum
-from datetime import datetime
+from datetime import datetime, date, timezone
 
 from sqlalchemy import (
     Column,
@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Boolean,
     Enum as SQLEnum,
+    text
 )
 from sqlalchemy.sql import expression
 from sqlalchemy.orm import declarative_base, relationship
@@ -33,7 +34,9 @@ class Users(Base):
         default=False,
         server_default=expression.false(),
     )
-    test_user = Column(Boolean, default=False, nullable=False)
+    test_user = Column(Boolean, nullable=False, default=False, server_default=expression.false(),)
+    birth_date = Column(DateTime, nullable=False, default=lambda: datetime(2000, 1, 1, tzinfo=timezone.utc), server_default=text("'2000-01-01 00:00:00+00'"))
+    gender = Column(String, nullable=False, default='male', server_default=text("'male'"))
 
     # One-to-one связь: у пользователя один access и один refresh токен
     google_fitness_api_access_token = relationship(
