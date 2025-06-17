@@ -113,6 +113,8 @@ async def create_or_update_user(
             name=google_user.name,
             picture=google_user.picture,
             test_user=google_user.test_user,
+            birth_date=google_user.birth_date,
+            gender=google_user.gender
         )
         session.add(db_user)
         await session.commit()
@@ -129,6 +131,12 @@ async def create_or_update_user(
         updated = True
     if db_user.picture != google_user.picture:
         db_user.picture = google_user.picture
+        updated = True
+    if db_user.birth_date != google_user.birth_date:
+        db_user.birth_date = google_user.birth_date
+        updated = True
+    if db_user.gender != google_user.gender:
+        db_user.gender = google_user.gender
         updated = True
 
     if updated:

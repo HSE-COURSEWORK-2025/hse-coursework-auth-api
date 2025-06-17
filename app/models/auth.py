@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import httpx
@@ -31,6 +31,8 @@ class GlobalUser(BaseModel):
     name: Optional[str] = None
     picture: Optional[str] = None
     test_user: Optional[bool] = None
+    birth_date: Optional[datetime] = datetime(2000, 1, 1, tzinfo=timezone.utc).replace(tzinfo=None)
+    gender: Optional[str] = 'male'
 
 
 class Token(BaseModel):
