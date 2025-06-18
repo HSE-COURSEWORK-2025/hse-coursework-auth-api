@@ -81,15 +81,29 @@ async def auth_google_code_fitness(
 
     # 4) Парсим дату рождения
     bdate = None
+    
+    year = 2000
+    month = 1
+    day = 1
+
     for b in profile.get("birthdays", []):
         if b.get("metadata", {}).get("primary"):
             d = b.get("date", {})
-            bdate = datetime(d["year"], d["month"], d["day"], tzinfo=timezone.utc)
-            break
+            if d:
+                year = d.get("year") if d.get("year") else year
+                month = d.get("month") if d.get("month") else month
+                day = d.get("day") if d.get("day") else day
+            
+            
     if bdate is None and profile.get("birthdays"):
         d = profile["birthdays"][0].get("date", {})
-        bdate = datetime(d["year"], d["month"], d["day"], tzinfo=timezone.utc)
 
+        year = d.get("year") if d.get("year") else year
+        month = d.get("month") if d.get("month") else month
+        day = d.get("day") if d.get("day") else day
+    
+    bdate = datetime(year, month, day, tzinfo=timezone.utc)
+    
     # 5) Verify id_token и get user info
     google_user = await verify_google_token(token_data["id_token"])
 
