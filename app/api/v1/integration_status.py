@@ -1,32 +1,19 @@
-import io
 from typing import List
-import qrcode
-from uuid import uuid4
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, status, Depends
-from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.redis.engine import redis_client
 from app.services.db.db_session import get_session
 from app.services.db.schemas import Users, UserIntegrations, IntegrationSource
 
 from app.models.auth import (
-    GlobalUser,
-    Token,
-    TokenRefreshRequest,
-    QRAuthData,
     TokenData,
 )
 from app.services.auth import (
     get_current_user,
-    verify_google_token,
-    create_access_token,
-    create_refresh_token,
 )
-from app.settings import settings
 
 from pydantic import BaseModel
 

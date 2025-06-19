@@ -2,14 +2,12 @@ import logging
 from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.settings import settings
-from app.services.db.schemas import Users, UserIntegrations, IntegrationSource
-from app.services.db.engine import db_engine
+from app.services.db.schemas import Users
 from app.services.db.db_session import get_session
 from app.services.auth import (
     verify_google_token,

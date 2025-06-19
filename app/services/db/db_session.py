@@ -1,8 +1,4 @@
 from app.services.db.engine import db_engine
-from sqlalchemy.ext.asyncio import (
-    create_async_engine,
-    AsyncSession,
-)
 
 
 async def get_session():

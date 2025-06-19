@@ -1,10 +1,5 @@
-import logging
-from datetime import datetime, timedelta
-from typing import Optional
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

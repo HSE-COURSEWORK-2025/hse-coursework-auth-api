@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime, date, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column,

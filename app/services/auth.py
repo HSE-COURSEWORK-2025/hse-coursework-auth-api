@@ -2,7 +2,6 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
-import httpx
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -17,10 +16,8 @@ from app.services.db.schemas import (
     GoogleFitnessAPIAccessTokens,
     GoogleFitnessAPIRefreshTokens,
 )
-from app.services.db.db_session import get_session
 from app.models.auth import (
     GlobalUser,
-    Token,
     TokenData,
 )
 

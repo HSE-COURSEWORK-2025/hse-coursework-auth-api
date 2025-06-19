@@ -1,7 +1,5 @@
 from pathlib import Path
 import logging
-import secrets
-import socket
 from pydantic import AnyHttpUrl, validator, EmailStr
 from pydantic_settings import BaseSettings
 

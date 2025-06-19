@@ -3,7 +3,6 @@ import os
 import qrcode
 from uuid import uuid4
 from datetime import datetime
-from typing import List
 
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.responses import StreamingResponse, FileResponse

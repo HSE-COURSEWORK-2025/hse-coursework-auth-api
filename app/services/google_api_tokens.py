@@ -1,34 +1,10 @@
 import logging
-from datetime import datetime, timedelta
-from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordBearer
-from google.oauth2 import id_token as google_id_token
-from google.auth.transport import requests as google_requests
-from jose import JWTError, jwt
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from fastapi import HTTPException, status
 
 from app.settings import settings
-from app.services.db.schemas import Users
-from app.services.db.db_session import get_session
 
-from app.models.auth import (
-    GoogleAuthRequest,
-    GoogleAuthCodeRequest,
-    GlobalUser,
-    Token,
-    TokenRefreshRequest,
-    TokenData,
-)
-from fastapi.responses import JSONResponse
-from app.services.db.schemas import (
-    GoogleFitnessAPIAccessTokens,
-    GoogleFitnessAPIRefreshTokens,
-)
-from urllib.parse import urlencode
 
 
 TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
