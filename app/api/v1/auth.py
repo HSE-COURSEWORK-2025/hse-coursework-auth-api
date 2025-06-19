@@ -276,3 +276,38 @@ async def auth_test_account(
         refresh_token=refresh_token,
         token_type="bearer",
     )
+
+
+@api_v1_auth_router.get(
+    "/auth-demo-account",
+    response_model=Token,
+    summary="Авторизация через демо аккаунт",
+)
+async def auth_demo_account(
+    session: AsyncSession = Depends(get_session),
+) -> Token:
+    q = select(Users).where(
+        Users.email == 'awesomecosmonaut@gmail.com'
+    )
+    result = await session.execute(q)
+    found_user = result.scalar_one_or_none()
+    if not found_user:
+        raise HTTPException(status_code=404, detail="User email not found")
+
+    # 7) Issue our JWTs
+    jwt_payload = {
+        "google_sub": found_user.google_sub,
+        "email": found_user.email,
+        "name": found_user.name,
+        "picture": found_user.picture,
+        "test_user": found_user.test_user,
+    }
+    access_token = create_access_token(data=jwt_payload)
+    refresh_token = create_refresh_token(data=jwt_payload)
+
+    return Token(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+    )
+
