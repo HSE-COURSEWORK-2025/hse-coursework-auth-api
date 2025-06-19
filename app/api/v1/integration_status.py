@@ -1,5 +1,3 @@
-# app/api/v2/qr_auth.py
-
 import io
 from typing import List
 import qrcode
@@ -55,9 +53,8 @@ async def get_user_integrations(
     session: AsyncSession = Depends(get_session),
 ) -> List[IntegrationOut]:
     """
-    Возвращает все подключения (источники) для авторизованного пользователя.
+    Возвращает все источники для авторизованного пользователя.
     """
-    # Находим пользователя по google_sub
     stmt_user = select(Users).where(Users.google_sub == current_user.google_sub)
     result_user = await session.execute(stmt_user)
     db_user = result_user.scalar_one_or_none()
@@ -68,7 +65,6 @@ async def get_user_integrations(
             detail="Пользователь не найден",
         )
 
-    # Загружаем интеграции этого пользователя
     stmt_integr = (
         select(UserIntegrations)
         .where(UserIntegrations.user_id == db_user.id)

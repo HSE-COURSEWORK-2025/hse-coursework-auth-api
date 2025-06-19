@@ -1,5 +1,3 @@
-# app/models.py
-
 import enum
 from datetime import datetime, date, timezone
 
@@ -11,7 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Boolean,
     Enum as SQLEnum,
-    text
+    text,
 )
 from sqlalchemy.sql import expression
 from sqlalchemy.orm import declarative_base, relationship
@@ -34,11 +32,22 @@ class Users(Base):
         default=False,
         server_default=expression.false(),
     )
-    test_user = Column(Boolean, nullable=False, default=False, server_default=expression.false(),)
-    birth_date = Column(DateTime, nullable=False, default=lambda: datetime(2000, 1, 1, tzinfo=timezone.utc), server_default=text("'2000-01-01 00:00:00+00'"))
-    gender = Column(String, nullable=False, default='male', server_default=text("'male'"))
+    test_user = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=expression.false(),
+    )
+    birth_date = Column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime(2000, 1, 1, tzinfo=timezone.utc),
+        server_default=text("'2000-01-01 00:00:00+00'"),
+    )
+    gender = Column(
+        String, nullable=False, default="male", server_default=text("'male'")
+    )
 
-    # One-to-one связь: у пользователя один access и один refresh токен
     google_fitness_api_access_token = relationship(
         "GoogleFitnessAPIAccessTokens",
         back_populates="user",
@@ -54,7 +63,6 @@ class Users(Base):
         cascade="all, delete-orphan",
     )
 
-    # One-to-many связь: у пользователя может быть несколько подключённых источников
     integrations = relationship(
         "UserIntegrations",
         back_populates="user",
@@ -75,7 +83,6 @@ class GoogleFitnessAPIAccessTokens(Base):
     )
     token = Column(String, nullable=False)
 
-    # Обратная связь к пользователю (one-to-one)
     user = relationship("Users", back_populates="google_fitness_api_access_token")
 
 
@@ -92,11 +99,9 @@ class GoogleFitnessAPIRefreshTokens(Base):
     )
     token = Column(String, nullable=False)
 
-    # Обратная связь к пользователю (one-to-one)
     user = relationship("Users", back_populates="google_fitness_api_refresh_token")
 
 
-# Возможные источники интеграций
 class IntegrationSource(enum.Enum):
     google_fitness_api = "google_fitness_api"
     google_health_api = "google_health_api"
@@ -118,5 +123,4 @@ class UserIntegrations(Base):
     )
     connected_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    # Обратная связь к пользователю
     user = relationship("Users", back_populates="integrations")

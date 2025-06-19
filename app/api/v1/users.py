@@ -11,7 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from urllib.parse import urlencode
 
 from app.settings import settings
-from app.services.db.schemas import Users, GoogleFitnessAPIAccessTokens, GoogleFitnessAPIRefreshTokens
+from app.services.db.schemas import (
+    Users,
+    GoogleFitnessAPIAccessTokens,
+    GoogleFitnessAPIRefreshTokens,
+)
 from app.services.db.db_session import get_session
 from app.services.google_api_tokens import is_token_valid, refresh_google_token
 from app.services.auth import create_access_token, create_refresh_token
@@ -19,12 +23,16 @@ from app.models.users import AccessToken
 
 api_v1_user_info_router = APIRouter(prefix="/internal/users")
 
-# Получить всех пользователей
+
 @api_v1_user_info_router.get("/get_all_users")
-async def get_all_users(session: AsyncSession = Depends(get_session), test_users: bool=False, real_users: bool=True):
+async def get_all_users(
+    session: AsyncSession = Depends(get_session),
+    test_users: bool = False,
+    real_users: bool = True,
+):
     if test_users and real_users:
         q = select(Users)
-    
+
     elif (real_users and not test_users) or (not real_users and test_users):
         q = select(Users).where(Users.test_user == test_users)
 
@@ -34,29 +42,35 @@ async def get_all_users(session: AsyncSession = Depends(get_session), test_users
     result = await session.execute(q)
     users = result.scalars().all()
 
-    google_fitness_api_token_url = f"{settings.DOMAIN_NAME}{settings.AUTH_API_GET_GOOGLE_FITNESS_API_TOKEN_PATH}"
-    access_token_url = f"{settings.DOMAIN_NAME}{settings.AUTH_API_GET_ACCESS_TOKEN_PATH}"
+    google_fitness_api_token_url = (
+        f"{settings.DOMAIN_NAME}{settings.AUTH_API_GET_GOOGLE_FITNESS_API_TOKEN_PATH}"
+    )
+    access_token_url = (
+        f"{settings.DOMAIN_NAME}{settings.AUTH_API_GET_ACCESS_TOKEN_PATH}"
+    )
 
     result_list = []
     for user in users:
         params = urlencode({"email": user.email})
-        result_list.append({
-            "google_sub": user.google_sub,
-            "email": user.email,
-            "name": user.name,
-            "picture": user.picture,
-            "google_fitness_api_token_url": f"{google_fitness_api_token_url}?{params}",
-            "access_token_url": f"{access_token_url}?{params}",
-        })
+        result_list.append(
+            {
+                "google_sub": user.google_sub,
+                "email": user.email,
+                "name": user.name,
+                "picture": user.picture,
+                "google_fitness_api_token_url": f"{google_fitness_api_token_url}?{params}",
+                "access_token_url": f"{access_token_url}?{params}",
+            }
+        )
 
     return result_list
+
 
 @api_v1_user_info_router.get(
     "/get_user_google_fitness_api_fresh_access_token", response_model=AccessToken
 )
 async def get_user_google_fitness_api_fresh_access_token(
-    email: str,
-    session: AsyncSession = Depends(get_session)
+    email: str, session: AsyncSession = Depends(get_session)
 ):
     q = select(Users).where(Users.email == email)
     result = await session.execute(q)
@@ -92,17 +106,12 @@ async def get_user_google_fitness_api_fresh_access_token(
         session.add(access_rec)
         await session.commit()
         return {"access_token": new_access}
-    
-    # token still valid
+
     return {"access_token": access_rec.token}
 
-@api_v1_user_info_router.get(
-    "/get_user_auth_token", response_model=AccessToken
-)
-async def get_user_auth_token(
-    email: str,
-    session: AsyncSession = Depends(get_session)
-):
+
+@api_v1_user_info_router.get("/get_user_auth_token", response_model=AccessToken)
+async def get_user_auth_token(email: str, session: AsyncSession = Depends(get_session)):
     q = select(Users).where(Users.email == email)
     result = await session.execute(q)
     user = result.scalar_one_or_none()

@@ -1,5 +1,3 @@
-# app/api/v2/qr_auth.py
-
 import io
 import os
 import qrcode
@@ -27,7 +25,6 @@ from starlette.concurrency import run_in_threadpool
 api_v1_qr_auth_router = APIRouter(prefix="/qr_auth", tags=["qr_auth"])
 
 
-
 @api_v1_qr_auth_router.get(
     "/get_auth_qr_code", summary="Получение QR кода для аутентификации"
 )
@@ -42,12 +39,10 @@ async def get_qr_code(
         user_email = current_user.email
         key = f"{settings.QR_AUTH_REDIS_PREFIX}{user_code}"
 
-        # Сохраняем email по ключу в Redis
         await redis_client.set(key, user_email)
 
         qr_url = f"{settings.DOMAIN_NAME}{settings.AUTH_API_QR_AUTH_PATH}?qr_code_data={user_code}"
 
-        # Обёртываем генерацию QR-кода в поток
         def generate_qr_bytes() -> bytes:
             qr = qrcode.QRCode(
                 version=1,
@@ -73,9 +68,7 @@ async def get_qr_code(
         )
 
 
-@api_v1_qr_auth_router.get(
-    "/auth_using_qr_code", summary="Вход по QR коду"
-)
+@api_v1_qr_auth_router.get("/auth_using_qr_code", summary="Вход по QR коду")
 async def process_qr_code(
     qr_code_data: str,
     session: AsyncSession = Depends(get_session),
@@ -87,7 +80,6 @@ async def process_qr_code(
     4) Регистрирует интеграцию google_health_api
     5) Возвращает QRAuthData с токенами и URL
     """
-    # 1) Достаём email из Redis
     key = f"{settings.QR_AUTH_REDIS_PREFIX}{qr_code_data}"
     user_email = await redis_client.get(key)
     await redis_client.delete(key)
@@ -98,7 +90,6 @@ async def process_qr_code(
             detail="Неверные данные QR-кода",
         )
 
-    # 2) Ищем пользователя
     q_user = select(Users).where(Users.email == user_email)
     res_user = await session.execute(q_user)
     user = res_user.scalar_one_or_none()
@@ -108,13 +99,9 @@ async def process_qr_code(
             detail="Пользователь не найден",
         )
 
-    # 3) Регистрируем интеграцию, если ещё не существует
-    q_int = (
-        select(UserIntegrations)
-        .where(
-            UserIntegrations.user_id == user.id,
-            UserIntegrations.source == IntegrationSource.google_health_api
-        )
+    q_int = select(UserIntegrations).where(
+        UserIntegrations.user_id == user.id,
+        UserIntegrations.source == IntegrationSource.google_health_api,
     )
     res_int = await session.execute(q_int)
     exists = res_int.scalar_one_or_none()
@@ -127,18 +114,16 @@ async def process_qr_code(
         session.add(new_int)
         await session.commit()
 
-    # 4) Генерируем JWT
     jwt_data = {
         "google_sub": user.google_sub,
-        "email":      user.email,
-        "name":       user.name,
-        "picture":    user.picture,
-        "test_user":  user.test_user,
+        "email": user.email,
+        "name": user.name,
+        "picture": user.picture,
+        "test_user": user.test_user,
     }
-    access_token  = create_access_token(data=jwt_data)
+    access_token = create_access_token(data=jwt_data)
     refresh_token = create_refresh_token(data=jwt_data)
 
-    # 5) Возвращаем QRAuthData
     return QRAuthData(
         post_here=f"{settings.DOMAIN_NAME}{settings.DATA_COLLECTION_API_POST_RAW_DATA_PATH}",
         access_token=access_token,

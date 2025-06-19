@@ -27,6 +27,8 @@ from app.models.auth import (
     TokenData,
     GlobalUser,
 )
+from jose import JWTError, jwt
+
 
 api_v1_auth_router = APIRouter(prefix="/auth")
 logger = logging.getLogger("auth")
@@ -41,7 +43,6 @@ async def auth_google_code_fitness(
     request_data: GoogleAuthCodeRequest,
     session: AsyncSession = Depends(get_session),
 ) -> Token:
-    # 1) Exchange code for tokens
     token_endpoint = "https://oauth2.googleapis.com/token"
     payload = {
         "code": request_data.code,
@@ -57,19 +58,16 @@ async def auth_google_code_fitness(
 
         access_token = token_data["access_token"]
 
-        # 2) Дополнительный запрос в People API
         people_endpoint = (
             "https://people.googleapis.com/v1/people/me"
             "?personFields=genders,birthdays"
         )
         people_resp = await client.get(
-            people_endpoint,
-            headers={"Authorization": f"Bearer {access_token}"}
+            people_endpoint, headers={"Authorization": f"Bearer {access_token}"}
         )
         people_resp.raise_for_status()
         profile = people_resp.json()
 
-    # 3) Парсим пол
     gender = None
     for g in profile.get("genders", []):
         meta = g.get("metadata", {})
@@ -79,9 +77,8 @@ async def auth_google_code_fitness(
     if gender is None and profile.get("genders"):
         gender = profile["genders"][0].get("value")
 
-    # 4) Парсим дату рождения
     bdate = None
-    
+
     year = 2000
     month = 1
     day = 1
@@ -93,24 +90,20 @@ async def auth_google_code_fitness(
                 year = d.get("year") if d.get("year") else year
                 month = d.get("month") if d.get("month") else month
                 day = d.get("day") if d.get("day") else day
-            
-            
+
     if bdate is None and profile.get("birthdays"):
         d = profile["birthdays"][0].get("date", {})
 
         year = d.get("year") if d.get("year") else year
         month = d.get("month") if d.get("month") else month
         day = d.get("day") if d.get("day") else day
-    
+
     bdate = datetime(year, month, day, tzinfo=timezone.utc)
-    
-    # 5) Verify id_token и get user info
+
     google_user = await verify_google_token(token_data["id_token"])
 
-    # 6) Create/update user and store tokens
     db_user = await create_or_update_user(session, google_user)
 
-    # 7) Записываем в модель пол и дату
     if gender:
         db_user.gender = gender
     if bdate:
@@ -119,17 +112,13 @@ async def auth_google_code_fitness(
 
     session.add(db_user)
 
-    await create_or_update_user_access_token(
-        session, google_user, access_token
-    )
+    await create_or_update_user_access_token(session, google_user, access_token)
     await create_or_update_user_refresh_token(
         session, google_user, token_data["refresh_token"]
     )
 
-    # 8) Сбросим флаг обновления токена и проставим интеграцию
     db_user.need_to_refresh_google_api_token = False
     session.add(db_user)
-    # … остальной код по UserIntegrations, коммит и отдача JWT …
     await session.commit()
     await session.refresh(db_user)
 
@@ -154,8 +143,6 @@ async def refresh_token(
     refresh_req: TokenRefreshRequest,
     session: AsyncSession = Depends(get_session),
 ) -> Token:
-    # 1) Decode our refresh token
-    from jose import JWTError, jwt
 
     try:
         payload = jwt.decode(
@@ -169,14 +156,12 @@ async def refresh_token(
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
-    # 2) Load user
     q = select(Users).where(Users.email == email)
     result = await session.execute(q)
     user = result.scalar_one_or_none()
     if not user or user.need_to_refresh_google_api_token:
         raise HTTPException(status_code=401, detail="User not found or token expired")
 
-    # 3) Issue new tokens
     jwt_payload = {
         "google_sub": user.google_sub,
         "email": user.email,
@@ -208,12 +193,10 @@ async def read_users_me(
 async def get_test_account(
     session: AsyncSession = Depends(get_session),
 ) -> Token:
-    # 1) Считаем количество тестовых юзеров
     cnt_q = select(func.count()).select_from(Users).where(Users.test_user.is_(True))
     result = await session.execute(cnt_q)
     test_count = result.scalar_one() or 0
 
-    # 2) Собираем данные
     new_index = test_count + 1
     google_user = GlobalUser(
         sub=f"test-sub-{new_index}",
@@ -223,12 +206,10 @@ async def get_test_account(
         test_user=True,
     )
 
-    # 3) Создаём или обновляем
     db_user = await create_or_update_user(session, google_user)
     await session.commit()
     await session.refresh(db_user)
 
-    # 4) Отдаём JWT
     jwt_payload = {
         "google_sub": db_user.google_sub,
         "email": db_user.email,
@@ -252,15 +233,12 @@ async def auth_test_account(
     test_account_login: str,
     session: AsyncSession = Depends(get_session),
 ) -> Token:
-    q = select(Users).where(
-        Users.google_sub == test_account_login
-    )
+    q = select(Users).where(Users.google_sub == test_account_login)
     result = await session.execute(q)
     found_user = result.scalar_one_or_none()
     if not found_user:
         raise HTTPException(status_code=404, detail="User login not found")
 
-    # 7) Issue our JWTs
     jwt_payload = {
         "google_sub": found_user.google_sub,
         "email": found_user.email,
@@ -286,15 +264,12 @@ async def auth_test_account(
 async def auth_demo_account(
     session: AsyncSession = Depends(get_session),
 ) -> Token:
-    q = select(Users).where(
-        Users.email == 'awesomecosmonaut@gmail.com'
-    )
+    q = select(Users).where(Users.email == "awesomecosmonaut@gmail.com")
     result = await session.execute(q)
     found_user = result.scalar_one_or_none()
     if not found_user:
         raise HTTPException(status_code=404, detail="User email not found")
 
-    # 7) Issue our JWTs
     jwt_payload = {
         "google_sub": found_user.google_sub,
         "email": found_user.email,
@@ -310,4 +285,3 @@ async def auth_demo_account(
         refresh_token=refresh_token,
         token_type="bearer",
     )
-

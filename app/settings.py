@@ -25,7 +25,6 @@ class Settings(BaseSettings):
     ROOT_PATH: str | None = "/auth-api"
     PORT: int | None = 8080
 
-    # SECRET_KEY: str = secrets.token_urlsafe(32)
     SECRET_KEY: str = "oleg"
 
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
@@ -47,8 +46,12 @@ class Settings(BaseSettings):
     AUTH_API_URL: str | None = f"{DOMAIN_NAME}:8081"
     AUTH_API_QR_AUTH_PATH: str | None = "/auth-api/api/v1/qr_auth/auth_using_qr_code"
     AUTH_API_REFRESH_TOKEN_PATH: str | None = "/auth-api/api/v1/auth/refresh"
-    AUTH_API_GET_GOOGLE_FITNESS_API_TOKEN_PATH: str | None = "/auth-api/api/v1/internal/users/get_user_google_fitness_api_fresh_access_token"
-    AUTH_API_GET_ACCESS_TOKEN_PATH: str | None = "/auth-api/api/v1/internal/users/get_user_auth_token"
+    AUTH_API_GET_GOOGLE_FITNESS_API_TOKEN_PATH: str | None = (
+        "/auth-api/api/v1/internal/users/get_user_google_fitness_api_fresh_access_token"
+    )
+    AUTH_API_GET_ACCESS_TOKEN_PATH: str | None = (
+        "/auth-api/api/v1/internal/users/get_user_auth_token"
+    )
 
     DATA_COLLECTION_API_URL: str | None = f"{DOMAIN_NAME}:8082"
     DATA_COLLECTION_API_POST_RAW_DATA_PATH: str | None = (
@@ -80,11 +83,9 @@ def setup_logging():
         level=settings.LOG_LEVEL.upper(),
         format=settings.LOG_DEFAULT_FORMAT,
     )
-    # uvicorn
     handler_default = logging.StreamHandler()
     handler_default.setFormatter(logging.Formatter(settings.LOG_UVICORN_FORMAT))
     logging.getLogger("uvicorn").handlers = [handler_default]
-    # uvicorn access
     handler_access = logging.StreamHandler()
     handler_access.setFormatter(logging.Formatter(settings.LOG_ACCESS_FORMAT))
     logging.getLogger("uvicorn.access").handlers = [handler_access]

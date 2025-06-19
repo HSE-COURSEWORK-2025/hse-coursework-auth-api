@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 setup_logging()
 
 
-# кастомизация для генератора openapi клиента
 def custom_generate_unique_id(route: APIRoute):
     return f"{route.tags[0]}-{route.name}"
 
@@ -32,7 +31,6 @@ app = FastAPI(
     contact={
         "name": settings.APP_CONTACT_NAME,
         "email": str(settings.APP_CONTACT_EMAIL),
-        # "url": str(settings.APP_CONTACT_URL),
     },
     generate_unique_id_function=custom_generate_unique_id,
     openapi_url=settings.APP_OPENAPI_URL,
@@ -42,7 +40,6 @@ app = FastAPI(
 )
 
 
-# Custom OpenAPI schema with Bearer token security scheme
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
@@ -53,7 +50,6 @@ def custom_openapi():
         routes=app.routes,
     )
 
-    # Добавляем сервер с указанием ROOT_PATH
     if settings.ROOT_PATH:
         openapi_schema["servers"] = [{"url": settings.ROOT_PATH}]
 
@@ -64,7 +60,6 @@ def custom_openapi():
             "bearerFormat": "JWT",
         }
     }
-    # Применяем схему безопасности глобально ко всем роутам
     for path in openapi_schema["paths"]:
         for method in openapi_schema["paths"][path]:
             openapi_schema["paths"][path][method]["security"] = [{"Bearer": []}]
@@ -98,9 +93,6 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    # await cmdb_client_stop()
-    # await FastAPILimiter.close()
-    ...
     await redis_client.disconnect()
 
 

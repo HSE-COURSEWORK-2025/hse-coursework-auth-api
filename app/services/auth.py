@@ -70,9 +70,7 @@ async def verify_google_token(token: str) -> GlobalUser:
         )
 
 
-def create_access_token(
-    data: dict, expires_delta: Optional[timedelta] = None
-) -> str:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + (
         expires_delta
@@ -83,9 +81,7 @@ def create_access_token(
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def create_refresh_token(
-    data: dict, expires_delta: Optional[timedelta] = None
-) -> str:
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + (
         expires_delta
@@ -114,14 +110,13 @@ async def create_or_update_user(
             picture=google_user.picture,
             test_user=google_user.test_user,
             birth_date=google_user.birth_date,
-            gender=google_user.gender
+            gender=google_user.gender,
         )
         session.add(db_user)
         await session.commit()
         await session.refresh(db_user)
         return db_user
 
-    # обновляем, если что-то поменялось
     updated = False
     if db_user.email != google_user.email:
         db_user.email = google_user.email
@@ -156,14 +151,12 @@ async def create_or_update_user_access_token(
     if not access_token:
         return
 
-    # Находим user
     q_user = select(Users).where(Users.google_sub == google_user.sub)
     res_user = await session.execute(q_user)
     db_user = res_user.scalar_one_or_none()
     if not db_user:
         return
 
-    # Ищем существующий токен
     q = select(GoogleFitnessAPIAccessTokens).where(
         GoogleFitnessAPIAccessTokens.user_id == db_user.id
     )
@@ -171,9 +164,7 @@ async def create_or_update_user_access_token(
     curr = res.scalar_one_or_none()
 
     if not curr:
-        new = GoogleFitnessAPIAccessTokens(
-            user_id=db_user.id, token=access_token
-        )
+        new = GoogleFitnessAPIAccessTokens(user_id=db_user.id, token=access_token)
         session.add(new)
     else:
         curr.token = access_token
@@ -204,9 +195,7 @@ async def create_or_update_user_refresh_token(
     curr = res.scalar_one_or_none()
 
     if not curr:
-        new = GoogleFitnessAPIRefreshTokens(
-            user_id=db_user.id, token=refresh_token
-        )
+        new = GoogleFitnessAPIRefreshTokens(user_id=db_user.id, token=refresh_token)
         session.add(new)
     else:
         curr.token = refresh_token

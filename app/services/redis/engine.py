@@ -1,6 +1,6 @@
 import aioredis
 import logging
-from app.settings import settings  # Путь до ваших настроек, если необходимо
+from app.settings import settings
 
 logger = logging.getLogger(__name__)
 

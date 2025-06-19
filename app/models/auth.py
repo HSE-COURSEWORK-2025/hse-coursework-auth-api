@@ -16,13 +16,12 @@ from app.services.db.schemas import Users
 from app.services.db.db_session import get_session
 
 
-# Pydantic-схемы
 class GoogleAuthRequest(BaseModel):
-    token: str  # для старого варианта (ID токен с клиента)
+    token: str
 
 
 class GoogleAuthCodeRequest(BaseModel):
-    code: str  # authorization code, полученный через initCodeClient на клиенте
+    code: str
 
 
 class GlobalUser(BaseModel):
@@ -31,8 +30,10 @@ class GlobalUser(BaseModel):
     name: Optional[str] = None
     picture: Optional[str] = None
     test_user: Optional[bool] = None
-    birth_date: Optional[datetime] = datetime(2000, 1, 1, tzinfo=timezone.utc).replace(tzinfo=None)
-    gender: Optional[str] = 'male'
+    birth_date: Optional[datetime] = datetime(2000, 1, 1, tzinfo=timezone.utc).replace(
+        tzinfo=None
+    )
+    gender: Optional[str] = "male"
 
 
 class Token(BaseModel):
