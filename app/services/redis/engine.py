@@ -1,8 +1,10 @@
 import aioredis
 import logging
 from app.settings import settings
+from app.settings import app_logger
 
-logger = logging.getLogger(__name__)
+
+# logger = logging.getLogger(__name__)
 
 
 class RedisClient:
@@ -23,9 +25,9 @@ class RedisClient:
                 self._redis = await aioredis.from_url(
                     f"redis://{settings.REDIS_HOST}", decode_responses=True
                 )
-                logger.info(f"Подключение к Redis: redis://{settings.REDIS_HOST}")
+                app_logger.info(f"Подключение к Redis: redis://{settings.REDIS_HOST}")
             except Exception as e:
-                logger.error(f"Ошибка подключения к Redis: {e}")
+                app_logger.error(f"Ошибка подключения к Redis: {e}")
                 raise
 
     async def disconnect(self):
@@ -34,7 +36,7 @@ class RedisClient:
         """
         if self._redis:
             await self._redis.close()
-            logger.info("Отключение от Redis.")
+            app_logger.info("Отключение от Redis.")
             self._redis = None
 
     def __getattr__(self, name):

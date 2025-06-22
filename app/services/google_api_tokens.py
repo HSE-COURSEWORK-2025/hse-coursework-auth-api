@@ -3,7 +3,7 @@ import logging
 import httpx
 from fastapi import HTTPException, status
 
-from app.settings import settings
+from app.settings import settings, app_logger
 
 
 
@@ -17,7 +17,7 @@ async def is_token_valid(access_token: str) -> bool:
         async with httpx.AsyncClient() as client:
             resp = await client.get(tokeninfo_url, timeout=5.0)
     except Exception as e:
-        logging.error("Error calling tokeninfo endpoint: %s", e)
+        app_logger.error("Error calling tokeninfo endpoint: %s", e)
         return False
 
     if resp.status_code != 200:

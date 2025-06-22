@@ -1,7 +1,14 @@
-from pathlib import Path
+import datetime
+import json
 import logging
+import logging
+from pathlib import Path
 from pydantic import AnyHttpUrl, validator, EmailStr
 from pydantic_settings import BaseSettings
+
+from multiprocessing import Queue
+from logging.handlers import QueueHandler, QueueListener
+
 
 
 class Settings(BaseSettings):
@@ -56,6 +63,9 @@ class Settings(BaseSettings):
         "/data-collection-api/api/v1/post_data/raw_data"
     )
 
+    OTLP_GRPC_ENDPOINT: str | None = "tempo:4317"
+    LOKI_URL: str | None = "http://loki:3100/loki/api/v1/push"
+
     @validator("BACKEND_CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v: str | list[str]) -> str | list[str]:
         if isinstance(v, str) and not v.startswith("["):
@@ -76,14 +86,39 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-def setup_logging():
-    logging.basicConfig(
-        level=settings.LOG_LEVEL.upper(),
-        format=settings.LOG_DEFAULT_FORMAT,
-    )
-    handler_default = logging.StreamHandler()
-    handler_default.setFormatter(logging.Formatter(settings.LOG_UVICORN_FORMAT))
-    logging.getLogger("uvicorn").handlers = [handler_default]
-    handler_access = logging.StreamHandler()
-    handler_access.setFormatter(logging.Formatter(settings.LOG_ACCESS_FORMAT))
-    logging.getLogger("uvicorn.access").handlers = [handler_access]
+class JsonConsoleFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        log = {
+            "timestamp"  : datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+            "level"      : record.levelname,
+            "logger"     : record.name,
+            "file"       : f"{record.filename}:{record.lineno}",
+            "status_code": getattr(record, "status_code", None),
+            "trace_id"   : getattr(record, "otelTraceID", None),
+            "span_id"    : getattr(record, "otelSpanID", None),
+            "service"    : getattr(record, "otelServiceName", None),
+            "msg"        : record.getMessage(),
+        }
+        return json.dumps(log, ensure_ascii=False)
+
+
+queue = Queue(-1)
+queue_handler = QueueHandler(queue)
+json_formatter = JsonConsoleFormatter()
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(json_formatter)
+console_handler.setLevel(logging.INFO)
+
+app_logger = logging.getLogger(settings.APP_TITLE)
+app_logger.setLevel(logging.INFO)
+app_logger.addHandler(console_handler)
+app_logger.addHandler(queue_handler)
+
+
+class EndpointFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return f"GET {settings.ROOT_PATH}/metrics" not in record.getMessage()
+
+uvicorn_access_logger = logging.getLogger("uvicorn.access")
+uvicorn_access_logger.addFilter(EndpointFilter())

@@ -20,9 +20,9 @@ from app.models.auth import (
     GlobalUser,
     TokenData,
 )
+from app.settings import app_logger
 
 
-logger = logging.getLogger("auth")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
@@ -60,7 +60,7 @@ async def verify_google_token(token: str) -> GlobalUser:
             test_user=False,
         )
     except ValueError:
-        logger.exception("Failed to verify Google token")
+        app_logger.exception("Failed to verify Google token")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Google token",

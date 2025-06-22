@@ -29,7 +29,7 @@ from jose import JWTError, jwt
 
 
 api_v1_auth_router = APIRouter(prefix="/auth")
-logger = logging.getLogger("auth")
+# logger = logging.getLogger("auth")
 
 
 @api_v1_auth_router.post(
