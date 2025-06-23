@@ -1,23 +1,33 @@
 import logging
+import json
+import datetime
 
-from prometheus_fastapi_instrumentator import Instrumentator
+# from prometheus_fastapi_instrumentator import Instrumentator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.routing import APIRoute
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
-from app.settings import settings, setup_logging
+from app.settings import settings, app_logger
 from app.api.root import root_router
 from app.api.v1.router import api_v1_router
 from app.services.db.schemas import Base
 from app.services.db.engine import db_engine
 
 from app.services.redis.engine import redis_client
+from opentelemetry.propagate import inject
+
+from logging_loki import LokiHandler
+from logging.handlers import QueueHandler, QueueListener
+
+from multiprocessing import Queue
+
+from app.services.utils import PrometheusMiddleware, metrics, setting_otlp
 
 
-logger = logging.getLogger(__name__)
-setup_logging()
+# logger = logging.getLogger(__name__)
+# setup_logging()
 
 
 def custom_generate_unique_id(route: APIRoute):
@@ -38,6 +48,19 @@ app = FastAPI(
     redoc_url=settings.APP_REDOC_URL,
     swagger_ui_oauth2_redirect_url=settings.APP_DOCS_URL + "/oauth2-redirect",
 )
+app.add_middleware(PrometheusMiddleware, app_name=settings.APP_TITLE)
+app.add_route("/metrics", metrics)
+setting_otlp(app, settings.APP_TITLE, settings.OTLP_GRPC_ENDPOINT)
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    response = await call_next(request)
+    status = response.status_code
+    app_logger.info(
+        f"{request.method} {request.url.path}",
+        extra={"status_code": status}
+    )
+    return response
 
 
 def custom_openapi():
@@ -69,20 +92,20 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-instrumentator = Instrumentator(
-    should_ignore_untemplated=True,
-    excluded_handlers=["/metrics"],
-).instrument(app)
+# instrumentator = Instrumentator(
+#     should_ignore_untemplated=True,
+#     excluded_handlers=["/metrics"],
+# ).instrument(app)
 
 
 @app.on_event("startup")
 async def startup_event():
-    instrumentator.expose(
-        app,
-        endpoint="/metrics",
-        include_in_schema=False,
-        tags=["root"],
-    )
+    # instrumentator.expose(
+    #     app,
+    #     endpoint="/metrics",
+    #     include_in_schema=False,
+    #     tags=["root"],
+    # )
     try:
         Base.metadata.create_all(bind=db_engine.engine)
     except Exception:

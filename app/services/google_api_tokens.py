@@ -3,8 +3,11 @@ import logging
 import httpx
 from fastapi import HTTPException, status
 
-from app.settings import settings
+from app.settings import settings, app_logger
 
+
+
+logger = logging.getLogger(__name__)
 
 
 TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
@@ -45,7 +48,7 @@ async def refresh_google_token(refresh_token: str) -> dict:
             timeout=10.0,
         )
     if resp.status_code != 200:
-        logging.warning("Google token refresh failed: %s", resp.text)
+        logger.warning("Google token refresh failed: %s", resp.text)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token outdated"
         )
