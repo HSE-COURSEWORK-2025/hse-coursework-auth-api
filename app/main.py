@@ -48,7 +48,9 @@ app = FastAPI(
     redoc_url=settings.APP_REDOC_URL,
     swagger_ui_oauth2_redirect_url=settings.APP_DOCS_URL + "/oauth2-redirect",
 )
-
+app.add_middleware(PrometheusMiddleware, app_name=settings.APP_TITLE)
+app.add_route("/metrics", metrics)
+setting_otlp(app, settings.APP_TITLE, settings.OTLP_GRPC_ENDPOINT)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):

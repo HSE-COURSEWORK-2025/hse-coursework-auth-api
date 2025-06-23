@@ -7,6 +7,9 @@ from app.settings import settings, app_logger
 
 
 
+logger = logging.getLogger(__name__)
+
+
 TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 TOKENINFO_ENDPOINT = "https://oauth2.googleapis.com/tokeninfo"
 
@@ -17,7 +20,7 @@ async def is_token_valid(access_token: str) -> bool:
         async with httpx.AsyncClient() as client:
             resp = await client.get(tokeninfo_url, timeout=5.0)
     except Exception as e:
-        app_logger.error("Error calling tokeninfo endpoint: %s", e)
+        logging.error("Error calling tokeninfo endpoint: %s", e)
         return False
 
     if resp.status_code != 200:
@@ -45,7 +48,7 @@ async def refresh_google_token(refresh_token: str) -> dict:
             timeout=10.0,
         )
     if resp.status_code != 200:
-        logging.warning("Google token refresh failed: %s", resp.text)
+        logger.warning("Google token refresh failed: %s", resp.text)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token outdated"
         )

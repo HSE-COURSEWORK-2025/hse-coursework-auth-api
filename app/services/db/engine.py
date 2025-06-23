@@ -10,7 +10,8 @@ from sqlalchemy.sql import text
 from sqlalchemy.engine import Result
 
 from .settings import settings
-from app.settings import app_logger
+
+logger = logging.getLogger("database")
 
 
 class AsyncDbEngine:
@@ -60,11 +61,11 @@ async def db_engine_check():
     """
     Проверка на подключение к базе: делаем SELECT version();
     """
-    app_logger.info(f"Connecting to database {settings.DB_HOST}:{settings.DB_PORT}")
+    logger.info(f"Connecting to database {settings.DB_HOST}:{settings.DB_PORT}")
     try:
         version_row = await db_engine.request(text("SELECT version();"))
     except Exception as e:
-        app_logger.error(f"Error connecting to database: {e}")
+        logger.error(f"Error connecting to database: {e}")
         raise
     version_info = version_row[0][0] if version_row else "Unknown"
-    app_logger.info(f"Database version: {version_info}")
+    logger.info(f"Database version: {version_info}")

@@ -9,6 +9,8 @@ from pydantic_settings import BaseSettings
 from multiprocessing import Queue
 from logging.handlers import QueueHandler, QueueListener
 
+from logging_loki import LokiHandler
+
 
 
 class Settings(BaseSettings):
@@ -109,6 +111,19 @@ json_formatter = JsonConsoleFormatter()
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(json_formatter)
 console_handler.setLevel(logging.INFO)
+
+
+http_loki_handler = LokiHandler(
+    url=settings.LOKI_URL,
+    tags={"application": settings.APP_TITLE},
+    auth=None,
+    version="1",
+)
+http_loki_handler.setFormatter(json_formatter)
+listener = QueueListener(queue, http_loki_handler)
+listener.start()
+
+
 
 app_logger = logging.getLogger(settings.APP_TITLE)
 app_logger.setLevel(logging.INFO)
